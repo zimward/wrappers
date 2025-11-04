@@ -257,6 +257,75 @@ let
     evaled.config;
 
   /**
+    A function to create a wrapper module for simple packages that just
+    require a single config file.
+
+    # Arguments
+
+    - `package`: the default package of the wrapper
+    - `format`: the configuration format. either a string with the name of the attr
+                in `pkgs.formats` or the functor of a simmilar generator
+    - `flag`: flag used to pass the configuration (optional). flag takes precedence over env
+    - `env`: environment variable used to pass the configuration. defaults to `XDG_CONFIG_HOME`
+    - `settingsDocs` link and/or manpage to the documentation of the configuration
+  */
+  wrapModuleSimple =
+    {
+      package,
+      format,
+      flag ? null,
+      flagSeperator ? null,
+      env ? "XDG_CONFIG_HOME",
+      settingsDocs ? null,
+    }:
+    wrapModule (
+      { config, wlib, ... }:
+      let
+        fmt = if lib.isString format then config.pkgs.formats.${format} { } else format;
+        name = package.pname;
+      in
+      {
+        options = {
+          settings = lib.mkOption {
+            type = fmt.type;
+            default = { };
+            description = ''
+              Configuration of ${name}. 
+            ''
+            ++ lib.optionalString (config.settingsDocs != null) "\nSee ${config.settingsDocs}";
+          };
+          settingsFile = lib.mkOption {
+            type = wlib.types.file;
+            default.content = fmt.generate "${name}-config" config.settings;
+            description = "Settings file of ${name}. Takes precedence over `settings`.";
+          };
+          extraFlags = lib.mkOption {
+            type = lib.types.attrsOf lib.types.unspecified; # TODO add list handling
+            default = { };
+            description = "Extra flags to pass to ${name}.";
+          };
+        };
+        config = {
+          package = lib.mkDefault package;
+        }
+        // config.lib.filterAttrs (_: v: v != null) {
+          env = if flag != null then { } else { ${env} = config.settingsFile.path; };
+          flags =
+            (
+              if flag != null then
+                {
+                  ${flag} = config.settingsFile.path;
+                }
+              else
+                { }
+            )
+            // config.extraFlags;
+          inherit flagSeperator;
+        };
+      }
+    );
+
+  /**
     Create a wrapped application that preserves all original outputs (man pages, completions, etc.)
 
     # Arguments
