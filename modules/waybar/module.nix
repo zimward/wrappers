@@ -56,8 +56,8 @@ in
 
   config.package = lib.mkDefault config.pkgs.waybar;
   config.flags = {
-    "--config" = config.configFile.path;
-    "--style" = config."style.css".path;
+    "--config" = builtins.toString config.configFile.path;
+    "--style" = builtins.toString  config."style.css".path;
   };
   config.meta.maintainers = [
     {
